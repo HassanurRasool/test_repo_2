@@ -1,0 +1,107 @@
+name: Sync Fork and Create PR
+
+on:
+  schedule:
+     - cron: '0 0 * * *' # Runs daily at midnight UTC
+  workflow_dispatch: # Allow manual triggering      
+
+
+jobs:
+  sync-and-pr:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout fork
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up Git
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          
+      - name: Add upstream remote
+        run: git remote add upstream https://github.com/HassanurRasool/test_repo_1.git
+
+      - name: Fetch upstream changes
+        run: git fetch upstream
+
+      - name: Create or Checkout sync-upstream_1 Branch
+        run: |
+          # Fetch all remote changes
+          git fetch --all
+          
+          # Check if sync-upstream_1 exists locally
+          if git show-ref --verify --quiet refs/heads/sync-upstream_1; then
+            echo "Branch sync-upstream_1 exists locally. Checking out..."
+            git checkout sync-upstream_1
+          else
+            if git ls-remote --heads origin sync-upstream_1 | grep sync-upstream_1; then
+              echo "Branch sync-upstream_1 exists on remote origin. Checking out..."
+              # Create a local branch tracking the remote branch
+              git checkout -b sync-upstream_1 origin/sync-upstream_1
+            else
+              echo "Branch sync-upstream_1 does not exist. Creating new branch..."
+              # Fetch from origin to ensure we have the latest information
+              git fetch origin
+
+              # Create the sync-upstream_1 branch based on origin/development-upstream
+              git checkout -b sync-upstream_1 origin/main
+              git push origin sync-upstream_1
+            fi
+          fi
+
+      - name: Check differences between sync-upstream_1 and upstream/development
+        run: |
+          git fetch upstream
+          git log HEAD..upstream/development --oneline
+
+      - name: Sync with upstream
+        uses: tgymnich/fork-sync@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }} # GitHub token for authentication
+          owner: 'arendst' # Owner of the upstream repository
+          repo: 'Tasmota' # Name of the upstream repository
+          head: 'development' # The branch in the upstream repository to sync from
+          base: 'sync-upstream_1' # The branch in your fork to sync to
+          merge_method: 'merge' # Method to use for merging changes (e.g., 'merge', 'rebase', 'squash')
+          auto_approve: true # Automatically approve the pull request if one is created
+          auto_merge: true # Automatically merge the pull request if one is created
+          
+      - name: Push changes to fork
+        run: git push origin sync-upstream_1
+
+      - name: Create or Checkout temp-fork-merge Branch
+        run: |
+          # Fetch all remote changes
+          git fetch --all
+          
+          # Handle temp-fork-merge branch
+          if git show-ref --verify --quiet refs/heads/temp-fork-merge; then
+            echo "Branch temp-fork-merge exists locally. Checking out..."
+            git checkout temp-fork-merge
+          else
+            if git ls-remote --heads origin temp-fork-merge | grep temp-fork-merge; then
+              echo "Branch temp-fork-merge exists on remote origin. Checking out..."
+              # Create a local branch tracking the remote branch
+              git checkout -b temp-fork-merge origin/temp-fork-merge
+            else
+              echo "Branch temp-fork-merge does not exist. Creating new branch..."
+              # Fetch from origin to ensure we have the latest information
+              git fetch origin
+
+              # Create the temp-fork-merge branch based on origin/development-base
+              git checkout -b temp-fork-merge origin/main
+              git push origin temp-fork-merge
+            fi
+          fi
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          title: 'Sync with upstream development branch'
+          body: 'This PR synchronizes the sync-upstream_1 branch with the latest changes from the upstream development branch.'
+          base: temp-fork-merge
+          branch: sync-upstream_1
