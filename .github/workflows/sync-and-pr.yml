@@ -8,6 +8,8 @@ on:
 permissions:
   contents: write # Allows the workflow to push changes
   actions: read # Allows the workflow to read and use actions
+  pull-requests: write
+  repository-projects: write
   
 jobs:
   sync-and-pr:
@@ -23,6 +25,7 @@ jobs:
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git remote set-url origin https://x-access-token:${{ secrets.PAT }}@github.com/HassanurRasool/test_repo_2.git
           
       - name: Add upstream remote
         run: git remote add upstream https://github.com/HassanurRasool/test_repo_1.git
@@ -61,16 +64,8 @@ jobs:
           git log HEAD..upstream/development --oneline
 
       - name: Sync with upstream
-        uses: tgymnich/fork-sync@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }} # GitHub token for authentication
-          owner: 'HassanurRasool' # Owner of the upstream repository
-          repo: 'test_repo_1' # Name of the upstream repository
-          head: 'development' # The branch in the upstream repository to sync from
-          base: 'sync-upstream_1' # The branch in your fork to sync to
-          merge_method: 'merge' # Method to use for merging changes (e.g., 'merge', 'rebase', 'squash')
-          auto_approve: true # Automatically approve the pull request if one is created
-          auto_merge: true # Automatically merge the pull request if one is created
+        run: |
+          git merge upstream/development --no-ff --commit -m "Sync with upstream development branch"
           
       - name: Push changes to fork
         run: git push origin sync-upstream_1
