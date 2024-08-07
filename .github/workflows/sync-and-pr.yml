@@ -106,6 +106,8 @@ jobs:
           GH_TOKEN: ${{ secrets.PAT }}
         run: |
           gh auth setup-git
+          git fetch origin temp-fork-merge
+          git fetch origin sync-upstream_1
           gh pr create --base temp-fork-merge --head sync-upstream_1 --title "Automatic Pull Request" --body "This is an automatically created pull request."
 
       #- name: Fetch sync-upstream_1 branch
