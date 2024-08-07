@@ -111,26 +111,28 @@ jobs:
           git log --oneline
           git diff temp-fork-merge..sync-upstream_1
 
-      - name: Create Pull Request
-        env:
-          GH_TOKEN: ${{ secrets.PAT }}
+      - name: Fetch sync-upstream_1 branch
         run: |
-          gh auth setup-git
-          gh pr create --base temp-fork-merge --head sync-upstream_1 --title "Automatic Pull Request" --body "This is an automatically created pull request."
-      #- name: Fetch sync-upstream_1 branch
-      #  run: |
-      #    git fetch origin sync-upstream_1
+          git fetch origin sync-upstream_1
 
-      #- name: Merge sync-upstream_1 into temp-fork-merge
-      #  run: |
+      - name: Merge sync-upstream_1 into temp-fork-merge
+        run: |
           # Checkout the temp-fork-merge branch
-      #    git checkout temp-fork-merge
+          git checkout temp-fork-merge
 
           # Merge the sync-upstream_1 branch into temp-fork-merge
-      #    git merge origin/sync-upstream_1 --allow-unrelated-histories --no-ff -m "Merge sync-upstream_1 into temp-fork-merge"
+          git merge origin/sync-upstream_1 --allow-unrelated-histories --no-ff -m "Merge sync-upstream_1 into temp-fork-merge"
 
           # Push the updated branch to the remote
-      #    git push origin temp-fork-merge
+          git push origin temp-fork-merge
+
+      #- name: Create Pull Request
+      #  env:
+      #    GH_TOKEN: ${{ secrets.PAT }}
+      #  run: |
+      #    gh auth setup-git
+      #    gh pr create --base temp-fork-merge --head sync-upstream_1 --title "Automatic Pull Request" --body "This is an automatically created pull request."
+      
           
       #- name: Create Pull Request
       #  uses: peter-evans/create-pull-request@v6
