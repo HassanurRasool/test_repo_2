@@ -64,8 +64,8 @@ jobs:
         uses: tgymnich/fork-sync@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }} # GitHub token for authentication
-          owner: 'arendst' # Owner of the upstream repository
-          repo: 'Tasmota' # Name of the upstream repository
+          owner: 'HassanurRasool' # Owner of the upstream repository
+          repo: 'test_repo_1' # Name of the upstream repository
           head: 'development' # The branch in the upstream repository to sync from
           base: 'sync-upstream_1' # The branch in your fork to sync to
           merge_method: 'merge' # Method to use for merging changes (e.g., 'merge', 'rebase', 'squash')
