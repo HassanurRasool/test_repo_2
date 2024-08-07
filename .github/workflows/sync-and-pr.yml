@@ -65,7 +65,7 @@ jobs:
 
       - name: Sync with upstream
         run: |
-          git merge upstream/development --no-ff --commit -m "Sync with upstream development branch"
+          git merge upstream/development --no-ff --commit --allow-unrelated-histories -m "Sync with upstream development branch"
           
       - name: Push changes to fork
         run: git push origin sync-upstream_1
