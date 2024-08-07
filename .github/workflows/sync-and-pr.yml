@@ -21,6 +21,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up GitHub CLI
+        uses: cli/cli-action@v2
+        with:
+          version: 'latest'
+
       - name: Set up Git
         run: |
           git config --global user.name 'github-actions[bot]'
@@ -95,6 +100,11 @@ jobs:
             fi
           fi
 
+      - name: Create Pull Request
+        run: |
+          gh auth login --with-token <<< ${{ secrets.GITHUB_TOKEN }}
+          gh pr create --base temp-fork-merge --head sync-upstream_1 --title "Automatic Pull Request" --body "This is an automatically created pull request."
+
       #- name: Fetch sync-upstream_1 branch
       #  run: |
       #    git fetch origin sync-upstream_1
@@ -119,12 +129,3 @@ jobs:
       #    base: sync-upstream_1
       #    branch: temp-fork-merge
 
-      - name: Set up GitHub CLI
-        uses: cli/cli-action@v2
-        with:
-          version: 'latest'
-
-      - name: Create Pull Request
-        run: |
-          gh auth login --with-token <<< ${{ secrets.GITHUB_TOKEN }}
-          gh pr create --base temp-fork-merge --head sync-upstream_1 --title "Automatic Pull Request" --body "This is an automatically created pull request."
