@@ -32,7 +32,6 @@ jobs:
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git remote set-url origin https://x-access-token:${{ secrets.PAT }}@github.com/HassanurRasool/test_repo_2.git
           
       - name: Add upstream remote
         run: git remote add upstream https://github.com/HassanurRasool/test_repo_1.git
