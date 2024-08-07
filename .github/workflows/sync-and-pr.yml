@@ -94,13 +94,28 @@ jobs:
               git push origin temp-fork-merge
             fi
           fi
+
+      - name: Fetch sync-upstream_1 branch
+        run: |
+          git fetch origin sync-upstream_1
+
+      - name: Merge sync-upstream_1 into temp-fork-merge
+        run: |
+          # Checkout the temp-fork-merge branch
+          git checkout temp-fork-merge
+
+          # Merge the sync-upstream_1 branch into temp-fork-merge
+          git merge origin/sync-upstream_1 --allow-unrelated-histories --no-ff -m "Merge sync-upstream_1 into temp-fork-merge"
+
+          # Push the updated branch to the remote
+          git push origin temp-fork-merge
           
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v6
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          title: 'Sync with upstream development branch'
-          body: 'This PR synchronizes the upstream branch with the latest changes from the upstream development branch.'
-          base: sync-upstream_1
-          branch: temp-fork-merge
+      #- name: Create Pull Request
+      #  uses: peter-evans/create-pull-request@v6
+      #  with:
+      #    token: ${{ secrets.GITHUB_TOKEN }}
+      #    title: 'Sync with upstream development branch'
+      #    body: 'This PR synchronizes the upstream branch with the latest changes from the upstream development branch.'
+      #    base: sync-upstream_1
+      #    branch: temp-fork-merge
           
