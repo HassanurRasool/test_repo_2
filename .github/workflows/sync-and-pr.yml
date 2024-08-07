@@ -95,20 +95,20 @@ jobs:
             fi
           fi
 
-      - name: Fetch sync-upstream_1 branch
-        run: |
-          git fetch origin sync-upstream_1
+      #- name: Fetch sync-upstream_1 branch
+      #  run: |
+      #    git fetch origin sync-upstream_1
 
-      - name: Merge sync-upstream_1 into temp-fork-merge
-        run: |
+      #- name: Merge sync-upstream_1 into temp-fork-merge
+      #  run: |
           # Checkout the temp-fork-merge branch
-          git checkout temp-fork-merge
+      #    git checkout temp-fork-merge
 
           # Merge the sync-upstream_1 branch into temp-fork-merge
-          git merge origin/sync-upstream_1 --allow-unrelated-histories --no-ff -m "Merge sync-upstream_1 into temp-fork-merge"
+      #    git merge origin/sync-upstream_1 --allow-unrelated-histories --no-ff -m "Merge sync-upstream_1 into temp-fork-merge"
 
           # Push the updated branch to the remote
-          git push origin temp-fork-merge
+      #    git push origin temp-fork-merge
           
       #- name: Create Pull Request
       #  uses: peter-evans/create-pull-request@v6
@@ -119,3 +119,12 @@ jobs:
       #    base: sync-upstream_1
       #    branch: temp-fork-merge
           
+      - name: Create Pull Request
+        uses: repo-sync/pull-request-creator@v1
+        with:
+          source_branch: 'sync-upstream_1'
+          target_branch: 'temp-fork-merge'
+          pr_title: 'Automatic Pull Request'
+          pr_body: 'This is an automatically created pull request.'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
