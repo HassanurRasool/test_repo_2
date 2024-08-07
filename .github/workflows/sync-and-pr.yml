@@ -5,7 +5,10 @@ on:
      - cron: '0 0 * * *' # Runs daily at midnight UTC
   workflow_dispatch: # Allow manual triggering      
 
-
+permissions:
+  contents: write # Allows the workflow to push changes
+  actions: read # Allows the workflow to read and use actions
+  
 jobs:
   sync-and-pr:
     runs-on: ubuntu-latest
