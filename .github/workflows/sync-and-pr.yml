@@ -101,28 +101,27 @@ jobs:
             fi
           fi
 
-      - name: Check out and verify branches
+      - name: Fetch and Checkout Branches
         run: |
-          git fetch origin temp-fork-merge
-          git fetch origin sync-upstream_1
-          git checkout temp-fork-merge
-          git log --oneline
-          git checkout sync-upstream_1
-          git log --oneline
-          git diff temp-fork-merge..sync-upstream_1
-
-      - name: Fetch sync-upstream_1 branch
-        run: |
-          git fetch origin sync-upstream_1
-
-      - name: Merge sync-upstream_1 into temp-fork-merge
-        run: |
+          # Fetch the latest changes from the remote
+          git fetch origin
+          
           # Checkout the temp-fork-merge branch
           git checkout temp-fork-merge
-
+      
+          # Ensure the branch is up-to-date with the remote
+          git pull origin temp-fork-merge
+      
+      - name: Merge sync-upstream_1 into temp-fork-merge
+        run: |
           # Merge the sync-upstream_1 branch into temp-fork-merge
-          git merge origin/sync-upstream_1 --allow-unrelated-histories --no-ff -m "Merge sync-upstream_1 into temp-fork-merge"
-
+          git merge origin/sync-upstream_1 --allow-unrelated-histories --no-ff -m "Merge sync-upstream_1 into temp-fork-merge" || {
+            echo "Merge conflict detected. Resolve conflicts and commit manually."
+            exit 1
+          }
+      
+      - name: Push the Updated Branch
+        run: |
           # Push the updated branch to the remote
           git push origin temp-fork-merge
 
