@@ -115,6 +115,6 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           title: 'Sync with upstream development branch'
-          body: 'This PR synchronizes the sync-upstream_1 branch with the latest changes from the upstream development branch.'
-          base: temp-fork-merge
-          branch: temp-fork-merge_2
+          body: 'This PR synchronizes the upstream branch with the latest changes from the upstream development branch.'
+          base: sync-upstream_1
+          branch: temp-fork-merge
