@@ -1,4 +1,4 @@
-name: Sync Fork and Create PR
+name: Sync, Merge, and Create PR
 
 on:
   schedule:
@@ -8,50 +8,114 @@ on:
 permissions:
   contents: write
   pull-requests: write
-  
-jobs:
-  sync-and-pr:
-    runs-on: ubuntu-latest
 
+jobs:
+  sync-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      changes_detected: ${{ steps.check_changes.outputs.changes }}
+    
     steps:
-      - name: Checkout fork
+      - name: Checkout repository
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0 # Full history for accurate merging
+          fetch-depth: 0
 
       - name: Set up Git
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          
+
       - name: Add upstream remote
-        run: git remote add upstream https://github.com/HassanurRasool/test_repo_1.git
-
-      - name: Fetch upstream changes
         run: |
+          git remote add upstream https://github.com/HassanurRasool/test_repo_1.git
           git fetch upstream
-          git fetch origin
+          echo "Current remotes:"
+          git remote -v
 
-      - name: Create or update sync-upstream_1 branch
+      - name: Create or update sync_merge branch
         run: |
-          if git ls-remote --exit-code --heads origin sync-upstream_1; then
-            git checkout sync-upstream_1
-            git reset --hard origin/sync-upstream_1
+          echo "Creating or updating sync_merge branch"
+          git checkout -B sync_merge origin/sync_merge || git checkout -b sync_merge
+          git reset --hard origin/sync_merge || true
+          git push origin sync_merge --force
+          echo "Current branch:"
+          git branch --show-current
+
+      - name: Sync changes to sync-branch
+        run: |
+          echo "Creating sync-branch based on upstream/development"
+          git checkout -b sync-branch upstream/development
+          echo "Current branch:"
+          git branch --show-current
+          echo "Pushing sync-branch to origin (your repository)"
+          git push origin sync-branch --force
+          echo "Branches on origin:"
+          git ls-remote --heads origin
+
+      - name: Check for changes
+        id: check_changes
+        run: |
+          git diff --quiet origin/sync_merge...sync-branch || echo "changes=true" >> $GITHUB_OUTPUT
+          echo "Changes detected: ${{ steps.check_changes.outputs.changes }}"
+
+  create-merge-request:
+    needs: sync-changes
+    if: needs.sync-changes.outputs.changes_detected == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      merge_conflicts: ${{ steps.check_conflicts.outputs.conflicts }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Create merge request
+        run: |
+          echo "Checking out sync_merge branch"
+          git checkout sync_merge
+          echo "Attempting to merge sync-branch into sync_merge"
+          git merge --no-commit --no-ff origin/sync-branch
+
+      - name: Check for conflicts
+        id: check_conflicts
+        run: |
+          if git diff --name-only --diff-filter=U | grep -q .; then
+            echo "conflicts=true" >> $GITHUB_OUTPUT
+            echo "Merge conflicts detected"
           else
-            git checkout -b sync-upstream_1 origin/main
+            echo "conflicts=false" >> $GITHUB_OUTPUT
+            echo "No merge conflicts detected"
           fi
-          git merge upstream/development --no-ff --commit --allow-unrelated-histories -m "Sync with upstream development branch"
-          git push -u origin sync-upstream_1
+
+      - name: Abort merge if conflicts
+        if: steps.check_conflicts.outputs.conflicts == 'true'
+        run: |
+          echo "Aborting merge due to conflicts"
+          git merge --abort
+
+  create-pull-request:
+    needs: [sync-changes, create-merge-request]
+    if: needs.sync-changes.outputs.changes_detected == 'true' && needs.create-merge-request.outputs.merge_conflicts == 'false'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: Sync with upstream development branch
-          title: Sync with upstream development branch
-          body: This PR synchronizes the main branch with the latest changes from the upstream development branch.
-          branch: sync-upstream_1
-          base: main
+          commit-message: Sync changes from upstream
+          title: Sync changes from upstream
+          body: This PR synchronizes changes from the upstream development branch.
+          branch: sync-branch
+          base: sync_merge
 
       - name: Check outputs
         run: |
