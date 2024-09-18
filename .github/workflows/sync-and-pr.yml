@@ -19,13 +19,6 @@ jobs:
         with:
           fetch-depth: 0 # Full history for accurate merging
 
-      - name: Install GitHub CLI
-        run: |
-          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo tee /usr/share/keyrings/githubcli-archive-keyring.gpg
-          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list
-          sudo apt update
-          sudo apt install gh
-
       - name: Set up Git
         run: |
           git config --global user.name 'github-actions[bot]'
@@ -46,24 +39,23 @@ jobs:
             git checkout -b sync-upstream_1 origin/sync-upstream_1
           else
             git checkout -b sync-upstream_1 origin/main
-            git push origin sync-upstream_1
           fi
 
       - name: Sync with upstream
         run: |
           git merge upstream/development --no-ff --commit --allow-unrelated-histories -m "Sync with upstream development branch"
-          git push origin sync-upstream_1
 
       - name: Create Pull Request
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          pr_url=$(gh pr create --base main --head sync-upstream_1 --title "Sync with upstream development branch" --body "This PR synchronizes the main branch with the latest changes from the upstream development branch.")
-          echo "Created PR: $pr_url"
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: Sync with upstream development branch
+          title: Sync with upstream development branch
+          body: This PR synchronizes the main branch with the latest changes from the upstream development branch.
+          branch: sync-upstream_1
+          base: main
 
-      - name: Cleanup
-        if: always()
+      - name: Check outputs
         run: |
-          git checkout main
-          git branch -D sync-upstream_1 || true
-          git push origin --delete sync-upstream_1 || true
+          echo "Pull Request Number - ${{ steps.cpr.outputs.pull-request-number }}"
+          echo "Pull Request URL - ${{ steps.cpr.outputs.pull-request-url }}"
