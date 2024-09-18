@@ -73,14 +73,22 @@ jobs:
           fetch-depth: 0
 
       - name: Create merge request
+        id: create_merge_request
         run: |
           echo "Checking out sync_merge branch"
           git checkout sync_merge
           echo "Attempting to merge sync-branch into sync_merge"
-          git merge --no-commit --no-ff origin/sync-branch
+          if git merge --no-commit --no-ff origin/sync-branch --allow-unrelated-histories; then
+            echo "Merge successful"
+          else
+            echo "Merge failed. This could be due to conflicts."
+            git merge --abort
+            echo "conflicts=true" >> $GITHUB_OUTPUT
+          fi
 
       - name: Check for conflicts
         id: check_conflicts
+        if: ${{ !contains(steps.create_merge_request.outputs.conflicts, 'true') }}
         run: |
           if git diff --name-only --diff-filter=U | grep -q .; then
             echo "conflicts=true" >> $GITHUB_OUTPUT
