@@ -1,4 +1,4 @@
-name: Sync and Create PR
+name: Sync, Merge, and Create PR
 
 on:
   schedule:
@@ -10,8 +10,10 @@ permissions:
   pull-requests: write
 
 jobs:
-  sync-and-pr:
+  sync-changes:
     runs-on: ubuntu-latest
+    outputs:
+      changes_detected: ${{ steps.check_changes.outputs.changes }}
     
     steps:
       - name: Checkout repository
@@ -54,34 +56,78 @@ jobs:
       - name: Check for changes
         id: check_changes
         run: |
-          if git diff --quiet origin/sync_merge...sync-branch; then
-            echo "No changes detected"
-            echo "changes=false" >> $GITHUB_OUTPUT
+          git diff --quiet origin/sync_merge...sync-branch || echo "changes=true" >> $GITHUB_OUTPUT
+          echo "Changes detected: ${{ steps.check_changes.outputs.changes }}"
+
+  create-merge-request:
+    needs: sync-changes
+    if: needs.sync-changes.outputs.changes_detected == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      merge_conflicts: ${{ steps.check_conflicts.outputs.conflicts }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Create merge request
+        id: create_merge_request
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          echo "Checking out sync_merge branch"
+          git checkout sync_merge
+          echo "Attempting to merge sync-branch into sync_merge"
+          if git merge --no-commit --no-ff origin/sync-branch --allow-unrelated-histories; then
+            echo "Merge successful"
           else
-            echo "Changes detected"
-            echo "changes=true" >> $GITHUB_OUTPUT
+            echo "Merge failed. This could be due to conflicts."
+            git merge --abort || true
+            echo "conflicts=true" >> $GITHUB_OUTPUT
           fi
 
+      - name: Check for conflicts
+        id: check_conflicts
+        if: ${{ !contains(steps.create_merge_request.outputs.conflicts, 'true') }}
+        run: |
+          if git diff --name-only --diff-filter=U | grep -q .; then
+            echo "conflicts=true" >> $GITHUB_OUTPUT
+            echo "Merge conflicts detected"
+          else
+            echo "conflicts=false" >> $GITHUB_OUTPUT
+            echo "No merge conflicts detected"
+          fi
+
+      - name: Abort merge if conflicts
+        if: steps.check_conflicts.outputs.conflicts == 'true'
+        run: |
+          echo "Aborting merge due to conflicts"
+          git merge --abort || true
+
+  create-pull-request:
+    needs: [sync-changes, create-merge-request]
+    if: needs.sync-changes.outputs.changes_detected == 'true' && needs.create-merge-request.outputs.merge_conflicts == 'false'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
       - name: Create Pull Request
-        if: steps.check_changes.outputs.changes == 'true'
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: Sync changes from upstream
           title: Sync changes from upstream
-          body: |
-            This PR synchronizes changes from the upstream development branch.
-            
-            Note: This PR may contain merge conflicts that need to be resolved manually.
+          body: This PR synchronizes changes from the upstream development branch.
           branch: sync-branch
           base: sync_merge
 
       - name: Check outputs
-        if: steps.check_changes.outputs.changes == 'true'
         run: |
           echo "Pull Request Number - ${{ steps.cpr.outputs.pull-request-number }}"
           echo "Pull Request URL - ${{ steps.cpr.outputs.pull-request-url }}"
-
-      - name: No changes
-        if: steps.check_changes.outputs.changes != 'true'
-        run: echo "No changes to commit. Skipping PR creation."
