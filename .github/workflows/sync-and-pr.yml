@@ -28,22 +28,20 @@ jobs:
         run: git remote add upstream https://github.com/HassanurRasool/test_repo_1.git
 
       - name: Fetch upstream changes
-        run: git fetch upstream
-
-      - name: Create or Checkout sync-upstream_1 Branch
         run: |
-          git fetch --all
-          if git show-ref --verify --quiet refs/heads/sync-upstream_1; then
+          git fetch upstream
+          git fetch origin
+
+      - name: Create or update sync-upstream_1 branch
+        run: |
+          if git ls-remote --exit-code --heads origin sync-upstream_1; then
             git checkout sync-upstream_1
-          elif git ls-remote --heads origin sync-upstream_1 | grep sync-upstream_1; then
-            git checkout -b sync-upstream_1 origin/sync-upstream_1
+            git reset --hard origin/sync-upstream_1
           else
             git checkout -b sync-upstream_1 origin/main
           fi
-
-      - name: Sync with upstream
-        run: |
           git merge upstream/development --no-ff --commit --allow-unrelated-histories -m "Sync with upstream development branch"
+          git push -u origin sync-upstream_1
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v5
