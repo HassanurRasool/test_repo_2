@@ -6,8 +6,8 @@ on:
   workflow_dispatch: # Allow manual triggering      
 
 permissions:
-  contents: write # Allows the workflow to push changes
-  actions: read # Allows the workflow to read and use actions
+  contents: write
+  actions: read
   pull-requests: write
   repository-projects: write
   
@@ -19,7 +19,20 @@ jobs:
       - name: Checkout fork
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # Full history for accurate merging
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
       - name: Install GitHub CLI
         run: |
@@ -41,104 +54,45 @@ jobs:
 
       - name: Create or Checkout sync-upstream_1 Branch
         run: |
-          # Fetch all remote changes
           git fetch --all
-          
-          # Check if sync-upstream_1 exists locally
           if git show-ref --verify --quiet refs/heads/sync-upstream_1; then
-            echo "Branch sync-upstream_1 exists locally. Checking out..."
             git checkout sync-upstream_1
+          elif git ls-remote --heads origin sync-upstream_1 | grep sync-upstream_1; then
+            git checkout -b sync-upstream_1 origin/sync-upstream_1
           else
-            if git ls-remote --heads origin sync-upstream_1 | grep sync-upstream_1; then
-              echo "Branch sync-upstream_1 exists on remote origin. Checking out..."
-              # Create a local branch tracking the remote branch
-              git checkout -b sync-upstream_1 origin/sync-upstream_1
-            else
-              echo "Branch sync-upstream_1 does not exist. Creating new branch..."
-              # Fetch from origin to ensure we have the latest information
-              git fetch origin
-
-              # Create the sync-upstream_1 branch based on origin/development-upstream
-              git checkout -b sync-upstream_1 origin/main
-              git push origin sync-upstream_1
-            fi
+            git checkout -b sync-upstream_1 origin/main
+            git push origin sync-upstream_1
           fi
-
-      - name: Check differences between sync-upstream_1 and upstream/development
-        run: |
-          git fetch upstream
-          git log HEAD..upstream/development --oneline
 
       - name: Sync with upstream
         run: |
           git merge upstream/development --no-ff --commit --allow-unrelated-histories -m "Sync with upstream development branch"
-          
-      - name: Push changes to fork
-        run: git push origin sync-upstream_1
+          git push origin sync-upstream_1
 
-      - name: Create or Checkout temp-fork-merge Branch
+      - name: Run tests
+        run: python -m unittest discover tests
+
+      - name: Run linter
+        run: pylint **/*.py
+
+      - name: Create Pull Request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Fetch all remote changes
-          git fetch --all
-          
-          # Handle temp-fork-merge branch
-          if git show-ref --verify --quiet refs/heads/temp-fork-merge; then
-            echo "Branch temp-fork-merge exists locally. Checking out..."
-            git checkout temp-fork-merge
-          else
-            if git ls-remote --heads origin temp-fork-merge | grep temp-fork-merge; then
-              echo "Branch temp-fork-merge exists on remote origin. Checking out..."
-              # Create a local branch tracking the remote branch
-              git checkout -b temp-fork-merge origin/temp-fork-merge
-            else
-              echo "Branch temp-fork-merge does not exist. Creating new branch..."
-              # Fetch from origin to ensure we have the latest information
-              git fetch origin
+          pr_url=$(gh pr create --base main --head sync-upstream_1 --title "Sync with upstream development branch" --body "This PR synchronizes the main branch with the latest changes from the upstream development branch.")
+          echo "Created PR: $pr_url"
 
-              # Create the temp-fork-merge branch based on origin/development-base
-              git checkout -b temp-fork-merge origin/main
-              git push origin temp-fork-merge
-            fi
-          fi
-
-      - name: Fetch and Checkout Branches
+      - name: Cleanup
+        if: always()
         run: |
-          # Fetch the latest changes from the remote
-          git fetch origin
-          
-          # Checkout the temp-fork-merge branch
-          git checkout temp-fork-merge
-      
-          # Ensure the branch is up-to-date with the remote
-          git pull origin temp-fork-merge
-      
-      - name: Merge sync-upstream_1 into temp-fork-merge
-        run: |
-          # Merge the sync-upstream_1 branch into temp-fork-merge
-          git merge origin/sync-upstream_1 --allow-unrelated-histories --no-ff -m "Merge sync-upstream_1 into temp-fork-merge" || {
-            echo "Merge conflict detected. Resolve conflicts and commit manually."
-            exit 1
-          }
-      
-      - name: Push the Updated Branch
-        run: |
-          # Push the updated branch to the remote
-          git push origin temp-fork-merge
+          git checkout main
+          git branch -D sync-upstream_1 || true
+          git push origin --delete sync-upstream_1 || true
 
-      #- name: Create Pull Request
-      #  env:
-      #    GH_TOKEN: ${{ secrets.PAT }}
-      #  run: |
-      #    gh auth setup-git
-      #    gh pr create --base temp-fork-merge --head sync-upstream_1 --title "Automatic Pull Request" --body "This is an automatically created pull request."
-      
-          
-      #- name: Create Pull Request
-      #  uses: peter-evans/create-pull-request@v6
-      #  with:
-      #    token: ${{ secrets.GITHUB_TOKEN }}
-      #    title: 'Sync with upstream development branch'
-      #    body: 'This PR synchronizes the upstream branch with the latest changes from the upstream development branch.'
-      #    base: sync-upstream_1
-      #    branch: temp-fork-merge
-
+      - name: Notify on failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: Workflow failed! Check the logs for more information.
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
